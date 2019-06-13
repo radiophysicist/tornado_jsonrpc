@@ -1,4 +1,5 @@
 import json
+import logging
 from copy import deepcopy
 from sys import exc_info
 
@@ -84,6 +85,9 @@ async def _get_response(request, views, request_body):
         version = _get_version(request_body)
         result = await _get_result(request, _get_method(views, request_body), request_body.get('params'))
     except Exception as exception:
+        if not isinstance(exception, BaseException):
+            logging.critical('Unhandled exception occured:\n{}', str(exc_info()[2]))
+
         return _get_with_protocol_version({'id': request_id, 'result': None, 'error': _get_error(exception)}, version)
 
     if request_id:
@@ -93,6 +97,7 @@ async def _get_response(request, views, request_body):
 def _get_method(views, request_body):
     method = getattr(views, request_body.get('method', ''), None)
     if not method:
+        logging.error('No handler defined for method \'{}\'', method)
         raise MethodNotFound
     return method
 
@@ -124,31 +129,35 @@ def _get_with_protocol_version(response, version):
     return updated_response
 
 
-class InvalidVersion(Exception):
+class BaseException(Exception):
+    pass
+
+
+class InvalidVersion(BaseException):
     code = -32600
     message = 'Invalid Request'
     data = None
 
 
-class MethodNotFound(Exception):
+class MethodNotFound(BaseException):
     code = -32601
     message = 'Method not found'
     data = None
 
 
-class InvalidParams(Exception):
+class InvalidParams(BaseException):
     code = -32602
     message = 'Invalid params'
     data = None
 
 
-class InternalError(Exception):
+class InternalError(BaseException):
     code = -32603
     message = 'Internal error'
     data = None
 
 
-class InvalidJSON(Exception):
+class InvalidJSON(BaseException):
     code = -32700
     message = 'Parse error'
     data = None
